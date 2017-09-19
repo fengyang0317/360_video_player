@@ -29,12 +29,8 @@ import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Choreographer;
-import android.view.GestureDetector;
-import android.view.GestureDetector.SimpleOnGestureListener;
-import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.TextureView;
-import android.view.View;
 
 import static com.oculus.sample.SphericalPlayerActivity.toast;
 
@@ -58,36 +54,9 @@ public class SphericalVideoPlayer extends TextureView {
 
     private boolean readyToPlay;
 
-    private class ScrollDeltaHolder {
-        float deltaX, deltaY;
+    private final float[] mRotationMatrix = new float[16];
 
-        ScrollDeltaHolder(float dx, float dy) {
-            deltaX = dx;
-            deltaY = dy;
-        }
-    }
-
-    private SimpleOnGestureListener dragListener = new SimpleOnGestureListener() {
-        @Override
-        public boolean onDown(MotionEvent e) {
-            return true;
-        }
-
-        @Override
-        public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-            if (renderThread == null) {
-                return false;
-            }
-
-            Message msg = Message.obtain();
-            msg.what = RenderThread.MSG_ON_SCROLL;
-            msg.obj = new ScrollDeltaHolder(distanceX, distanceY);
-            renderThread.handler.sendMessage(msg);
-            return true;
-        }
-    };
-
-    private GestureDetector gestureDetector;
+    private final float[] mRotationVector= new float[4];
 
     public SphericalVideoPlayer(Context context) {
         this(context, null);
@@ -99,14 +68,20 @@ public class SphericalVideoPlayer extends TextureView {
 
     public SphericalVideoPlayer(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        gestureDetector = new GestureDetector(getContext(), dragListener);
+    }
 
-        setOnTouchListener(new OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                return gestureDetector.onTouchEvent(event);
-            }
-        });
+    public void setRotationMatrix(float[] _rm) {
+        System.arraycopy(_rm, 0, mRotationMatrix, 0, 16);
+        Message msg = Message.obtain();
+        msg.what = RenderThread.MSG_ON_SCROLL;
+        renderThread.handler.sendMessage(msg);
+    }
+
+    public void setRotationVector(float[] _rv) {
+        System.arraycopy(_rv, 0, mRotationVector, 0, 4);
+        Message msg = Message.obtain();
+        msg.what = RenderThread.MSG_ON_SCROLL;
+        renderThread.handler.sendMessage(msg);
     }
 
     public void initRenderThread(SurfaceTexture surface, int width, int height) {
@@ -261,7 +236,7 @@ public class SphericalVideoPlayer extends TextureView {
                                onSurfaceDestroyed();
                                break;
                            case MSG_ON_SCROLL:
-                               onScroll((ScrollDeltaHolder)msg.obj);
+                               onScroll();
                                break;
                         }
                     }
@@ -352,21 +327,26 @@ public class SphericalVideoPlayer extends TextureView {
         }
 
         private void updateCamera() {
-            lat = Math.max(-85, Math.min(85, lat));
+//            lat = Math.max(-85, Math.min(85, lat));
+//
+//            float phi = (float)Math.toRadians(90 - lat);
+//            float theta = (float)Math.toRadians(lon);
+//
+//            camera[0] = (float)(100.f * Math.sin(phi) * Math.cos(theta));
+//            camera[1] = (float)(100.f * Math.cos(phi));
+//            camera[2] = (float)(100.f * Math.sin(phi) * Math.sin(theta));
+//
+//            Matrix.setLookAtM(
+//                    viewMatrix, 0,
+//                    camera[0], camera[1], camera[2],
+//                    0, 0, 0,
+//                    0, 1, 0
+//            );
 
-            float phi = (float)Math.toRadians(90 - lat);
-            float theta = (float)Math.toRadians(lon);
-
-            camera[0] = (float)(100.f * Math.sin(phi) * Math.cos(theta));
-            camera[1] = (float)(100.f * Math.cos(phi));
-            camera[2] = (float)(100.f * Math.sin(phi) * Math.sin(theta));
-
-            Matrix.setLookAtM(
-                    viewMatrix, 0,
-                    camera[0], camera[1], camera[2],
+            Matrix.setLookAtM(viewMatrix, 0,
                     0, 0, 0,
-                    0, 1, 0
-            );
+                    mRotationVector[0], mRotationVector[1], mRotationVector[2],
+                    0, 0, 1);
         }
 
         private void onFrameAvailable() {
@@ -399,9 +379,9 @@ public class SphericalVideoPlayer extends TextureView {
             renderer.release();
         }
 
-        private void onScroll(ScrollDeltaHolder deltaHolder) {
-            lon = (deltaHolder.deltaX) * DRAG_FRICTION + lon;
-            lat = -(deltaHolder.deltaY) * DRAG_FRICTION + lat;
+        private void onScroll() {
+            //lon = (deltaHolder.deltaX) * DRAG_FRICTION + lon;
+            //lat = -(deltaHolder.deltaY) * DRAG_FRICTION + lat;
             pendingCameraUpdate = true;
         }
     }

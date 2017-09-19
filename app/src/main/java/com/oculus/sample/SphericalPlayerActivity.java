@@ -19,6 +19,11 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.os.Message;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -35,7 +40,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-public class SphericalPlayerActivity extends AppCompatActivity {
+public class SphericalPlayerActivity extends AppCompatActivity implements SensorEventListener {
     private final String SAMPLE_VIDEO_PATH =
             "android.resource://com.oculus.sample/raw/" + R.raw.sample360;
 
@@ -43,9 +48,21 @@ public class SphericalPlayerActivity extends AppCompatActivity {
 
     private SphericalVideoPlayer videoPlayer;
 
+    private SensorManager mSensorManager;
+
+    private Sensor mRotationVectorSensor;
+
+    private final float[] mRotationMatrix = new float[16];
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Get an instance of the SensorManager
+        mSensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
+        // find the rotation-vector sensor
+        mRotationVectorSensor = mSensorManager.getDefaultSensor(
+                Sensor.TYPE_ROTATION_VECTOR);
 
         setContentView(R.layout.activity_main);
         videoPlayer = (SphericalVideoPlayer) findViewById(R.id.spherical_video_player);
@@ -61,7 +78,15 @@ public class SphericalPlayerActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
 
+
+        mSensorManager.unregisterListener(this);
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mSensorManager.registerListener(this, mRotationVectorSensor, 10000);
     }
 
     private void requestExternalStoragePermission() {
@@ -139,5 +164,25 @@ public class SphericalPlayerActivity extends AppCompatActivity {
             return null;
         }
         return text.toString();
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        // we received a sensor event. it is a good practice to check
+        // that we received the proper event
+        if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
+            // convert the rotation-vector to a 4x4 matrix. the matrix
+            // is interpreted by Open GL as the inverse of the
+            // rotation-vector, which is what we want.
+//            SensorManager.getRotationMatrixFromVector(
+//                    mRotationMatrix , event.values);
+//            videoPlayer.setRotationMatrix(mRotationMatrix);
+            videoPlayer.setRotationVector(event.values);
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int i) {
+
     }
 }
